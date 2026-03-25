@@ -12,6 +12,16 @@
       <button class="add-btn" @click="addTask">添加</button>
     </view>
 
+    <!-- 新增：截止日期选择 -->
+    <view class="deadline-area">
+      <text class="deadline-label">截止时间：</text>
+      <picker mode="date" :value="newDeadline" @change="onNewDeadlineChange">
+        <view class="deadline-picker">
+          {{ newDeadline || '请选择截止日期' }}
+        </view>
+      </picker>
+    </view>
+
     <!-- 统计区域 -->
     <view class="stats-area">
       <text>总数：{{ taskList.length }}</text>
@@ -56,8 +66,15 @@
         v-for="(item, index) in filteredTaskList"
         :key="index"
       >
-        <view class="task-text" :class="{ completed: item.completed }">
-          {{ item.text }}
+        <view class="task-info">
+          <view class="task-text" :class="{ completed: item.completed }">
+            {{ item.text }}
+          </view>
+
+          <!-- 只给未完成任务显示截止时间 -->
+          <view v-if="!item.completed && item.deadline" class="deadline-text">
+            截止：{{ item.deadline }}
+          </view>
         </view>
 
         <view class="btn-group">
@@ -108,6 +125,16 @@
           placeholder="请输入新的任务内容"
         />
 
+        <!-- 新增：编辑截止时间 -->
+        <view v-if="currentTask && !currentTask.completed" class="popup-deadline-area">
+          <text class="deadline-label">截止时间：</text>
+          <picker mode="date" :value="editDeadline" @change="onEditDeadlineChange">
+            <view class="deadline-picker">
+              {{ editDeadline || '请选择截止日期' }}
+            </view>
+          </picker>
+        </view>
+
         <button class="popup-btn confirm-btn" @click="confirmEdit">确定</button>
         <button class="popup-cancel-btn" @click="closeEditPopup">取消</button>
       </view>
@@ -120,16 +147,19 @@ export default {
   data() {
     return {
       newTask: '',
+      newDeadline: '',
       taskList: [],
       currentFilter: 'all',
       showActionPopup: false,
       showEditPopup: false,
       currentTask: null,
-      editText: ''
+      editText: '',
+      editDeadline: ''
     }
   },
 
   onLoad() {
+    this.newDeadline = this.getToday()
     this.loadTasks()
   },
 
@@ -156,6 +186,22 @@ export default {
   },
 
   methods: {
+    getToday() {
+      const date = new Date()
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+
+    onNewDeadlineChange(e) {
+      this.newDeadline = e.detail.value
+    },
+
+    onEditDeadlineChange(e) {
+      this.editDeadline = e.detail.value
+    },
+
     addTask() {
       if (!this.newTask.trim()) {
         uni.showToast({
@@ -165,12 +211,22 @@ export default {
         return
       }
 
+      if (!this.newDeadline) {
+        uni.showToast({
+          title: '请选择截止时间',
+          icon: 'none'
+        })
+        return
+      }
+
       this.taskList.push({
         text: this.newTask.trim(),
-        completed: false
+        completed: false,
+        deadline: this.newDeadline
       })
 
       this.newTask = ''
+      this.newDeadline = this.getToday()
       this.saveTasks()
     },
 
@@ -198,6 +254,9 @@ export default {
     markActive() {
       if (this.currentTask) {
         this.currentTask.completed = false
+        if (!this.currentTask.deadline) {
+          this.currentTask.deadline = this.getToday()
+        }
         this.saveTasks()
       }
       this.closeActionPopup()
@@ -220,6 +279,7 @@ export default {
       if (!this.currentTask) return
 
       this.editText = this.currentTask.text
+      this.editDeadline = this.currentTask.deadline || this.getToday()
       this.showActionPopup = false
       this.showEditPopup = true
     },
@@ -227,6 +287,7 @@ export default {
     closeEditPopup() {
       this.showEditPopup = false
       this.editText = ''
+      this.editDeadline = ''
       this.currentTask = null
     },
 
@@ -241,11 +302,17 @@ export default {
 
       if (this.currentTask) {
         this.currentTask.text = this.editText.trim()
+
+        if (!this.currentTask.completed) {
+          this.currentTask.deadline = this.editDeadline || this.getToday()
+        }
+
         this.saveTasks()
       }
 
       this.showEditPopup = false
       this.editText = ''
+      this.editDeadline = ''
       this.currentTask = null
     },
 
@@ -256,7 +323,10 @@ export default {
     loadTasks() {
       const data = uni.getStorageSync('todoList')
       if (data) {
-        this.taskList = data
+        this.taskList = data.map(item => ({
+          ...item,
+          deadline: item.deadline || ''
+        }))
       }
     }
   }
@@ -281,7 +351,7 @@ export default {
 .input-area {
   display: flex;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .task-input {
@@ -299,6 +369,29 @@ export default {
   height: 40px;
   line-height: 40px;
   font-size: 14px;
+}
+
+.deadline-area,
+.popup-deadline-area {
+  margin-bottom: 15px;
+}
+
+.deadline-label {
+  display: block;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.deadline-picker {
+  height: 40px;
+  line-height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: #333;
+  box-sizing: border-box;
 }
 
 .stats-area {
@@ -343,12 +436,21 @@ export default {
   align-items: center;
 }
 
-.task-text {
+.task-info {
   flex: 1;
+  padding-right: 10px;
+}
+
+.task-text {
   font-size: 16px;
   color: #333;
-  padding-right: 10px;
   word-break: break-all;
+}
+
+.deadline-text {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #ff7a00;
 }
 
 .completed {
