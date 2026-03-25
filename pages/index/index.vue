@@ -12,7 +12,7 @@
       <button class="add-btn" @click="addTask">添加</button>
     </view>
 
-    <!-- 新增：截止日期选择 -->
+    <!-- 截止日期 -->
     <view class="deadline-area">
       <text class="deadline-label">截止时间：</text>
       <picker mode="date" :value="newDeadline" @change="onNewDeadlineChange">
@@ -20,6 +20,34 @@
           {{ newDeadline || '请选择截止日期' }}
         </view>
       </picker>
+    </view>
+
+    <!-- 新增：提醒设置 -->
+    <view class="remind-area">
+      <view class="remind-switch-row">
+        <text class="deadline-label">开启提醒：</text>
+        <switch :checked="newRemindEnabled" @change="onNewRemindSwitchChange" />
+      </view>
+
+      <view v-if="newRemindEnabled">
+        <view class="picker-block">
+          <text class="deadline-label">提醒日期：</text>
+          <picker mode="date" :value="newRemindDate" @change="onNewRemindDateChange">
+            <view class="deadline-picker">
+              {{ newRemindDate || '请选择提醒日期' }}
+            </view>
+          </picker>
+        </view>
+
+        <view class="picker-block">
+          <text class="deadline-label">提醒时间：</text>
+          <picker mode="time" :value="newRemindTime" @change="onNewRemindTimeChange">
+            <view class="deadline-picker">
+              {{ newRemindTime || '请选择提醒时间' }}
+            </view>
+          </picker>
+        </view>
+      </view>
     </view>
 
     <!-- 统计区域 -->
@@ -71,9 +99,15 @@
             {{ item.text }}
           </view>
 
-          <!-- 只给未完成任务显示截止时间 -->
           <view v-if="!item.completed && item.deadline" class="deadline-text">
             截止：{{ item.deadline }}
+          </view>
+
+          <view
+            v-if="!item.completed && item.remindEnabled && item.remindDate && item.remindTime"
+            class="remind-text"
+          >
+            提醒：{{ item.remindDate }} {{ item.remindTime }}
           </view>
         </view>
 
@@ -125,7 +159,6 @@
           placeholder="请输入新的任务内容"
         />
 
-        <!-- 新增：编辑截止时间 -->
         <view v-if="currentTask && !currentTask.completed" class="popup-deadline-area">
           <text class="deadline-label">截止时间：</text>
           <picker mode="date" :value="editDeadline" @change="onEditDeadlineChange">
@@ -133,6 +166,34 @@
               {{ editDeadline || '请选择截止日期' }}
             </view>
           </picker>
+        </view>
+
+        <!-- 新增：编辑提醒设置 -->
+        <view v-if="currentTask && !currentTask.completed" class="popup-deadline-area">
+          <view class="remind-switch-row">
+            <text class="deadline-label">开启提醒：</text>
+            <switch :checked="editRemindEnabled" @change="onEditRemindSwitchChange" />
+          </view>
+
+          <view v-if="editRemindEnabled">
+            <view class="picker-block">
+              <text class="deadline-label">提醒日期：</text>
+              <picker mode="date" :value="editRemindDate" @change="onEditRemindDateChange">
+                <view class="deadline-picker">
+                  {{ editRemindDate || '请选择提醒日期' }}
+                </view>
+              </picker>
+            </view>
+
+            <view class="picker-block">
+              <text class="deadline-label">提醒时间：</text>
+              <picker mode="time" :value="editRemindTime" @change="onEditRemindTimeChange">
+                <view class="deadline-picker">
+                  {{ editRemindTime || '请选择提醒时间' }}
+                </view>
+              </picker>
+            </view>
+          </view>
         </view>
 
         <button class="popup-btn confirm-btn" @click="confirmEdit">确定</button>
@@ -148,18 +209,27 @@ export default {
     return {
       newTask: '',
       newDeadline: '',
+      newRemindEnabled: false,
+      newRemindDate: '',
+      newRemindTime: '',
+
       taskList: [],
       currentFilter: 'all',
       showActionPopup: false,
       showEditPopup: false,
       currentTask: null,
+
       editText: '',
-      editDeadline: ''
+      editDeadline: '',
+      editRemindEnabled: false,
+      editRemindDate: '',
+      editRemindTime: ''
     }
   },
 
   onLoad() {
     this.newDeadline = this.getToday()
+    this.newRemindDate = this.getToday()
     this.loadTasks()
   },
 
@@ -202,6 +272,42 @@ export default {
       this.editDeadline = e.detail.value
     },
 
+    onNewRemindSwitchChange(e) {
+      this.newRemindEnabled = e.detail.value
+      if (this.newRemindEnabled) {
+        if (!this.newRemindDate) this.newRemindDate = this.getToday()
+      } else {
+        this.newRemindDate = ''
+        this.newRemindTime = ''
+      }
+    },
+
+    onNewRemindDateChange(e) {
+      this.newRemindDate = e.detail.value
+    },
+
+    onNewRemindTimeChange(e) {
+      this.newRemindTime = e.detail.value
+    },
+
+    onEditRemindSwitchChange(e) {
+      this.editRemindEnabled = e.detail.value
+      if (this.editRemindEnabled) {
+        if (!this.editRemindDate) this.editRemindDate = this.getToday()
+      } else {
+        this.editRemindDate = ''
+        this.editRemindTime = ''
+      }
+    },
+
+    onEditRemindDateChange(e) {
+      this.editRemindDate = e.detail.value
+    },
+
+    onEditRemindTimeChange(e) {
+      this.editRemindTime = e.detail.value
+    },
+
     addTask() {
       if (!this.newTask.trim()) {
         uni.showToast({
@@ -219,14 +325,28 @@ export default {
         return
       }
 
+      if (this.newRemindEnabled && (!this.newRemindDate || !this.newRemindTime)) {
+        uni.showToast({
+          title: '请选择完整提醒时间',
+          icon: 'none'
+        })
+        return
+      }
+
       this.taskList.push({
         text: this.newTask.trim(),
         completed: false,
-        deadline: this.newDeadline
+        deadline: this.newDeadline,
+        remindEnabled: this.newRemindEnabled,
+        remindDate: this.newRemindEnabled ? this.newRemindDate : '',
+        remindTime: this.newRemindEnabled ? this.newRemindTime : ''
       })
 
       this.newTask = ''
       this.newDeadline = this.getToday()
+      this.newRemindEnabled = false
+      this.newRemindDate = this.getToday()
+      this.newRemindTime = ''
       this.saveTasks()
     },
 
@@ -280,6 +400,10 @@ export default {
 
       this.editText = this.currentTask.text
       this.editDeadline = this.currentTask.deadline || this.getToday()
+      this.editRemindEnabled = !!this.currentTask.remindEnabled
+      this.editRemindDate = this.currentTask.remindDate || this.getToday()
+      this.editRemindTime = this.currentTask.remindTime || ''
+
       this.showActionPopup = false
       this.showEditPopup = true
     },
@@ -288,6 +412,9 @@ export default {
       this.showEditPopup = false
       this.editText = ''
       this.editDeadline = ''
+      this.editRemindEnabled = false
+      this.editRemindDate = ''
+      this.editRemindTime = ''
       this.currentTask = null
     },
 
@@ -300,11 +427,22 @@ export default {
         return
       }
 
+      if (this.editRemindEnabled && (!this.editRemindDate || !this.editRemindTime)) {
+        uni.showToast({
+          title: '请选择完整提醒时间',
+          icon: 'none'
+        })
+        return
+      }
+
       if (this.currentTask) {
         this.currentTask.text = this.editText.trim()
 
         if (!this.currentTask.completed) {
           this.currentTask.deadline = this.editDeadline || this.getToday()
+          this.currentTask.remindEnabled = this.editRemindEnabled
+          this.currentTask.remindDate = this.editRemindEnabled ? this.editRemindDate : ''
+          this.currentTask.remindTime = this.editRemindEnabled ? this.editRemindTime : ''
         }
 
         this.saveTasks()
@@ -313,6 +451,9 @@ export default {
       this.showEditPopup = false
       this.editText = ''
       this.editDeadline = ''
+      this.editRemindEnabled = false
+      this.editRemindDate = ''
+      this.editRemindTime = ''
       this.currentTask = null
     },
 
@@ -325,7 +466,10 @@ export default {
       if (data) {
         this.taskList = data.map(item => ({
           ...item,
-          deadline: item.deadline || ''
+          deadline: item.deadline || '',
+          remindEnabled: item.remindEnabled || false,
+          remindDate: item.remindDate || '',
+          remindTime: item.remindTime || ''
         }))
       }
     }
@@ -372,7 +516,8 @@ export default {
 }
 
 .deadline-area,
-.popup-deadline-area {
+.popup-deadline-area,
+.remind-area {
   margin-bottom: 15px;
 }
 
@@ -392,6 +537,16 @@ export default {
   background: #fff;
   color: #333;
   box-sizing: border-box;
+}
+
+.remind-switch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.picker-block {
+  margin-top: 10px;
 }
 
 .stats-area {
@@ -451,6 +606,12 @@ export default {
   margin-top: 6px;
   font-size: 13px;
   color: #ff7a00;
+}
+
+.remind-text {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #007aff;
 }
 
 .completed {
