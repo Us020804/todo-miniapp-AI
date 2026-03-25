@@ -1,0 +1,13 @@
+# 依赖目录
+node_modules/
+
+# HBuilderX / uni-app 打包产物
+unpackage/
+dist/
+
+# HBuilderX 本地配置
+.hbuilderx/
+
+# 系统文件
+.DS_Store
+Thumbs.db
