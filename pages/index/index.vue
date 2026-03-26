@@ -65,6 +65,13 @@
       <text>已完成：{{ completedCount }}</text>
       <text>未完成：{{ activeCount }}</text>
     </view>
+
+    <!-- 清空已完成 -->
+    <view class="clear-completed-area">
+      <button class="clear-completed-btn" size="mini" @click="clearCompletedTasks">
+        清空已完成的所有任务
+      </button>
+    </view>
 	
 	<view class="status-tip-box">
 	  <text class="tip-item tip-overdue">红色：已逾期</text>
@@ -525,6 +532,33 @@ export default {
       this.currentTask = null
     },
 
+    clearCompletedTasks() {
+      const completedCount = this.taskList.filter(item => item.completed).length
+      if (completedCount === 0) {
+        uni.showToast({
+          title: '没有可清空的已完成任务',
+          icon: 'none'
+        })
+        return
+      }
+
+      uni.showModal({
+        title: '提示',
+        content: '确定清空所有已完成任务吗？',
+        success: (res) => {
+          if (res.confirm) {
+            this.taskList = this.taskList.filter(item => !item.completed)
+
+            // 关闭弹窗并清理当前选择，避免引用已删除任务对象
+            this.closeActionPopup()
+            this.currentTask = null
+
+            this.saveTasks()
+          }
+        }
+      })
+    },
+
     openEditPopup() {
       if (!this.currentTask) return
 
@@ -711,6 +745,16 @@ export default {
   border-radius: 10px;
   font-size: 14px;
   color: #555;
+}
+
+.clear-completed-area {
+  margin-bottom: 15px;
+}
+
+.clear-completed-btn {
+  width: 100%;
+  background-color: #ff4d4f;
+  color: #fff;
 }
 
 .filter-area {
